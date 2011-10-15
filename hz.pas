@@ -79,6 +79,7 @@ begin
   hz_log('hz v' + version + ' started', LOG_INFO);
 
 {$IFDEF LINUX}
+  FpSignal(SIGCHLD, SignalHandler(SIG_IGN));
   if Opts.IsDaemon = 1 then
     Daemonize;
 {$ENDIF}
