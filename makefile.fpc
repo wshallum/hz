@@ -1,0 +1,17 @@
+#
+#   Makefile.fpc for hz
+#
+
+[package]
+name=hz
+version=0.5
+
+[target]
+programs=hz
+
+[dist]
+destdir=./../distrib
+zipname=hz-$(PACKAGE_VERSION) 
+
+[default]
+fpcdir=e:\devel\fpc\src
