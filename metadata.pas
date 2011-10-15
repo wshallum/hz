@@ -23,26 +23,17 @@ unit metadata;
 
 interface
 
-uses SysUtils, Classes, net,
+uses {$IFDEF LINUX}BaseUnix,{$ENDIF}SysUtils, Classes, net,
      tags, cuesheet, timing, config, b64, script, log;
-
-
-type
-  TUpdateThread = class(TThread)
-  private
-    fname: string;
-  protected
-    procedure Execute; override;
-  public
-    constructor Create(filename: string); overload;
-    constructor Create; overload;
-  end;
 
 procedure metadata_update(filename: string); overload;
 procedure metadata_update(time: dword); overload;
 function metadata_cueload(cuename: string): boolean;
 
 implementation
+
+var
+  _filename: string;
 
 function URLEncode(const S: string): string;
 var
@@ -60,12 +51,9 @@ end;
 
 procedure log_metadata_update(Artist, Title: string);
 begin
-  hz_logln_term(#13'Getting tags...                                          ', LOG_DEBUG);
-  hz_log('Getting tags...', LOG_DEBUG);
   if Artist = '' then Artist := 'N/A';
   if Title  = '' then Title  := 'N/A';
   //
-  hz_log_term(#13'                                                           '#13, LOG_INFO);
   hz_log_both('Artist : ' + Artist, LOG_INFO);
   hz_log_both('Title  : ' + Title, LOG_INFO);
 end;
@@ -82,11 +70,11 @@ begin
     Result := Opts.name;
 end;
 
-
 function get_tags(filename: string): string;
 var
   Artist, Title: string;
 begin
+  hz_log_both('Getting tags...', LOG_DEBUG);
   tag_get_id3v1(filename, Artist, Title);
   if (Artist <> '') or (Title <> '') then
   begin
@@ -124,22 +112,22 @@ begin
   Result := format_metadata(Artist, Title);
 end;
 
-
-procedure TUpdateThread.Execute;
+procedure Execute(p: pointer);
 var
   Sock: integer;
   headers: string;
   metadata: string;
 begin
+  //writeln('entering execute');
+
   // get metadata from id3v1 or id3v2 tags
-  if fname <> '' then
-    metadata := get_tags(fname)
+  if _filename <> '' then
+    metadata := get_tags(_filename)
   // or from cuesheet
   else
     metadata := get_tags_cue;
   //writeln('metadata = ', metadata);
   metadata := script_onmetadata(metadata);
-  hz_log_term(#13'                                                   '#13, LOG_INFO);
   hz_log_both('Metadata set to: ' + metadata, LOG_INFO);
   metadata := URLEncode(metadata);
 
@@ -159,37 +147,52 @@ begin
   net_send(Sock, headers[1], length(headers));
   pause(100);
   net_close(Sock);
-end;
-
-constructor TUpdateThread.Create(filename: string); overload;
-begin
-  fname := filename;
-  inherited Create(true);
-  FreeOnTerminate := True;
-  Resume;
-end;
-
-constructor TUpdateThread.Create; overload;
-begin
-  fname := '';
-  inherited Create(true);
-  FreeOnTerminate := True;
-  Resume;
+  //writeln('leaving execute');
 end;
 
 procedure metadata_update(filename: string); overload;
+{$IFDEF LINUX}
 var
-  thr: TUpdateThread;
+  t: TPid;
+{$ENDIF}
 begin
-  thr := TUpdateThread.Create(filename);
+  _filename := filename;
+  //writeln('entering metadata_update');
+{$IFDEF LINUX}
+  t := FpFork;
+  if t = 0 then // new "thread"
+  begin
+    Execute(nil);
+    FpExit(0); // die child here
+  end;
+{$ELSE}
+  BeginThread(@Execute);
+{$ENDIF}
+  //writeln('leaving metadata_update');
 end;
 
 procedure metadata_update(time: dword); overload;
+{$IFDEF LINUX}
 var
-  thr: TUpdateThread;
+  t: TPid;
+{$ENDIF}
 begin
+  //writeln('entering metadata_update');
   if cue_isupdate(time) then
-    thr := TUpdateThread.Create;
+  begin
+    _filename := '';
+{$IFDEF LINUX}
+    t := FpFork;
+    if t = 0 then // new "thread"
+    begin
+      Execute(nil);
+      FpExit(0); // die child here
+    end;
+{$ELSE}
+    BeginThread(@Execute);
+{$ENDIF}
+  end;
+  //writeln('leaving metadata_update');
 end;
 
 function metadata_cueload(cuename: string): boolean;

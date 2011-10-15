@@ -72,15 +72,24 @@ end;
 
 function cue_isupdate(time: dword): boolean;
 begin
+  //hz_log_both('cue_isupdate', LOG_DEBUG);
+  //hz_log_both('idx= ' + IntToStr(idx) + ' len= ' + IntTostr(Length(CueEntries)), LOG_DEBUG);
+
   Result := False;
+
+  if idx < Length(CueEntries) then
+  begin
   if time >= CueEntries[idx].Time then
   begin
-    if idx < Length(CueEntries) then
+    //if idx < Length(CueEntries) then
     begin
       idx := idx + 1;
       Result := True;
     end;
   end;
+  end;
+  //hz_log_both('cue_isupdate2', LOG_DEBUG);
+
 end;
 
 function cue_load(cuefile: string): boolean;
@@ -127,6 +136,7 @@ begin
     Result := True;
 
   idx := 0;
+
   (*
   for i := 0 to Length(CueEntries) - 1 do
   begin

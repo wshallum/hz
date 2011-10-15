@@ -38,6 +38,11 @@ procedure hz_log_both(s: string; level: integer);
 
 implementation
 
+{$IFDEF WINDOWS}
+function CharToOem(SrsString, DstString: pchar): LongBool; stdcall;
+  external 'user32.dll' name 'CharToOemA';
+{$ENDIF}
+
 procedure hz_log(s: string; level: integer);
 var
   fs: TFileStream;
@@ -58,25 +63,39 @@ begin
      0: lvl := 'INFO ';
      1: lvl := 'DEBUG';
   end;
-  // write also to terminal
-  //writeln(s);
   ss := time + ' ' + lvl + ' ' + s + crlf;
   fs.Write(ss[1], length(ss));
   fs.Free;
 end;
 
 procedure hz_log_term(s: string; level: integer);
+var
+  z: string;
 begin
-  if level > Opts.loglevel then exit;
+  if (level > Opts.loglevel) then exit;
   // write to terminal
-  write(s);
+{$IFDEF WINDOWS}
+  z := space(Length(s));
+  CharToOem(pchar(s), pchar(z));
+{$ELSE}
+  z := s;
+{$ENDIF}
+  write(#13 + space(79) + #13 + z);
 end;
 
 procedure hz_logln_term(s: string; level: integer);
+var
+  z: string;
 begin
-  if level > Opts.loglevel then exit;
+  if (level > Opts.loglevel) then exit;
   // write to terminal
-  writeln(s);
+{$IFDEF WINDOWS}
+  z := space(Length(s));
+  CharToOem(pchar(s), pchar(z));
+{$ELSE}
+  z := s;
+{$ENDIF}
+  writeln(#13 + space(79) + #13 + z);
 end;
 
 procedure hz_log_both(s: string; level: integer);

@@ -27,6 +27,7 @@ uses SysUtils {$IFDEF LINUX}, BaseUnix {$ENDIF};
 
 procedure SetCtrlCHandler;
 function IsAborted: boolean;
+procedure AbortNow;
 
 implementation
 
@@ -38,7 +39,7 @@ procedure CtrlHandler(sig: cint); cdecl;
 begin
   //writeln('signal= ', sig);
   if sig = SIGINT then
-    Aborted := True;
+    AbortNow;
 end;
 
 {$ELSE}
@@ -78,6 +79,11 @@ end;
 function IsAborted: boolean;
 begin
   Result := Aborted;
+end;
+
+procedure AbortNow;
+begin
+  Aborted := True;
 end;
 
 end.

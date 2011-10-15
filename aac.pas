@@ -26,7 +26,7 @@ interface
 uses SysUtils, Classes,
      log;
 
-function aac_GetFileInfo(filename: string; var br: real; var sr, frames, ch: dword): integer;
+function aac_GetFileInfo(filename: string; var br: real; var spf, sr, frames, ch: dword): integer;
 function aac_GetFrames(fs: TFileStream; framestoread: dword; var sbuf: array of byte): dword;
 function aac_SeekTo1stFrame(fs: TFileStream): integer;
 function aac_IsValidFrameHeader(header: array of byte): boolean;
@@ -187,7 +187,7 @@ end;
 
 
 function aac_GetFileInfo(filename: string;
-  var br: real; var sr, frames, ch: dword): integer;
+  var br: real; var spf, sr, frames, ch: dword): integer;
 var
   fs: TFileStream;
   fixheader: array[0..3] of byte;
@@ -313,6 +313,7 @@ try
 finally
   fs.Free;
 end;
+  spf := 1024;
   sr := sftable[sfindex];
   frames := frame - 1;
   nsamples := 1024 * frames;

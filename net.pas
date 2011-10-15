@@ -39,10 +39,10 @@ var
   R: THostResolver;
 begin
   Result := False;
-  s := socket(AF_INET, SOCK_STREAM, 0);
-  if SocketError <> 0 then
+  s := Socket(AF_INET, SOCK_STREAM, 0);
+  if s = -1 then
   begin
-    writeln('error socket');
+    writeln('error socket= ', SocketError);
     exit;
   end;
   SAddr.sin_family := AF_INET;

@@ -7,5 +7,5 @@ I had to install readline-devel rpm package with my Fedora 3 as well to be able 
 2.2 If you are using Windows: download lua5.1.dll library from http://luabinaries.luaforge.net and place it in the same dir where hz.exe should reside.
 2.3 Finally edit CONFIG.INC and uncomment the statement {$DEFINE USE_LUA}
 
-3. Type 'fpc hz.pas' or just 'make'.
+3. Do 'make'.
 This should produce a ready executable.

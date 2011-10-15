@@ -70,8 +70,10 @@ begin
   begin
     save_idx;
     // get_next_file := pl.Strings[idx];
+    if idx > (pl.Count - 1) then idx := 0;
     np := pl.Strings[idx];
     load_playlist;
+    if idx > (pl.Count - 1) then idx := 0;
     while (np = pl.Strings[idx]) do
     begin
       if Opts.PlayRandom = 0 then

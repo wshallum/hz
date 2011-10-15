@@ -21,15 +21,24 @@ program hz;
 {$MODE DELPHI}
 {$H+}
 
-uses {$IFDEF LINUX}cthreads,{$ENDIF} SysUtils, Classes, DateUtils,
-     net, aac, playlist, timing, metadata, config, ctrlc, b64, script, log;
+uses {$IFDEF LINUX}cthreads, BaseUnix, daemon,{$ENDIF} SysUtils, Classes, DateUtils,
+     net, aac, mpx, playlist, timing, metadata, config, ctrlc, b64, script, log;
 
 label reconnect;
 
+type
+  Tfmt_GetFileInfo = function(filename: string; var br: real; var spf, sr, frames, ch: dword): integer;
+  Tfmt_SeekTo1stFrame = function(fs: TFileStream): integer;
+  Tfmt_GetFrames = function(fs: TFileStream; framestoread: dword; var sbuf: array of byte): dword;
+
 const
-  bufsize = 50000;
+  bufsize = 100000;
 
 var
+  fmt_GetFileInfo: Tfmt_GetFileInfo;
+  fmt_SeekTo1stFrame: Tfmt_SeekTo1stFrame;
+  fmt_GetFrames: Tfmt_GetFrames;
+  spf: dword;
   Sock: integer;
   fs: TFileStream;
   headers, response: string;
@@ -49,12 +58,17 @@ var
   Connected: boolean;
   ConnectionAttemptsCount: integer = 0;
   cuesheet: boolean;
-
+  contenttype: string;
+  onplay: integer;
 begin
-  writeln('hz v' + version);
-  writeln('AAC, AACplus, AACplusV2 Icecast source client');
-  writeln('Copyright (C) 2006 Roman Butusov. <reaxis at mail dot ru>');
+
+  writeln('=====================================================================');
+  writeln(' hz v' + version);
+  writeln(' AAC/AACplus/AACplusV2 & MP1/MP2/MP3 Icecast/Shoutcast source client');
+  writeln(' Copyright (C) 2006-2007 Roman Butusov <reaxis at mail dot ru>');
+  writeln('=====================================================================');
   writeln;
+  Flush(output);
   if not FileExists(ParamStr(1)) then
   begin
     writeln('Couldn''t find hz config file: ' + ParamStr(1));
@@ -64,6 +78,12 @@ begin
   hz_log('---------------------------', LOG_INFO);
   hz_log('hz v' + version + ' started', LOG_INFO);
 
+{$IFDEF LINUX}
+  if Opts.IsDaemon = 1 then
+    Daemonize;
+{$ENDIF}
+  
+
   try
     // load script
     if script_init = -1 then exit;
@@ -72,6 +92,20 @@ begin
     begin
       hz_log_both('Error loading playlist: ' + Opts.playlist, LOG_ERROR);
       exit;
+    end;
+
+    if Opts.streamtype = 'aac' then
+    begin
+      fmt_GetFileInfo := aac_GetFileInfo;
+      fmt_SeekTo1stFrame := aac_SeekTo1stFrame;
+      fmt_GetFrames := aac_GetFrames;
+      contenttype := 'audio/aacp';
+    end
+    else begin
+      fmt_GetFileInfo := mpx_GetFileInfo;
+      fmt_SeekTo1stFrame := mpx_SeekTo1stFrame;
+      fmt_GetFrames := mpx_GetFrames;
+      contenttype := 'audio/mpeg';
     end;
 
     SetCtrlCHandler;
@@ -85,7 +119,7 @@ begin
 
         filename := get_next_file;
         if filename = '' then exit;
-        res := aac_GetFileInfo(filename, br, sr, frames, ch);
+        res := fmt_GetFileInfo(filename, br, spf, sr, frames, ch);
 
 reconnect:
         // if not connected yet, then do so
@@ -131,7 +165,7 @@ reconnect:
               net_close(sock);
               continue;
             end;
-            headers := 'content-type:audio/aacp' + crlf +
+            headers := 'content-type:' + contenttype + crlf +
                 'icy-name:' + Opts.name + crlf +
                 'icy-genre:' + Opts.genre + crlf +
                 'icy-url:' + Opts.url + crlf +
@@ -141,7 +175,7 @@ reconnect:
           end
           else
             headers := 'SOURCE /' + Opts.mount + ' HTTP/1.0' + crlf +
-               'Content-Type: audio/aacp' + crlf +
+               'Content-Type: ' + contenttype + crlf +
                'Authorization: Basic ' + EncodeBase64('source:' + Opts.password) + crlf +
                'User-Agent: hz/' + version + crlf +
                'ice-name: ' + Opts.name + crlf +
@@ -171,7 +205,7 @@ reconnect:
           TimeBegin := Now;
         end;
 
-        // if aac file is good, then play it
+        // if audio file is good, then play it
         if res = 0 then
         begin
           hz_log_both('Playing ' + filename, LOG_INFO);
@@ -195,12 +229,12 @@ reconnect:
 
           // open aac file and stop by the 1st frame position
           fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyWrite);
-          aac_SeekTo1stFrame(fs);
+          fmt_SeekTo1stFrame(fs);
 
           FramesSent := 0;
           TimeSent := 0;
           // get number of frames to read in 1 iteration
-          FramesToRead := Round(sr / 1024);
+          FramesToRead := Round(sr / spf);
 
           while (FramesSent < frames) do
           begin
@@ -211,11 +245,11 @@ reconnect:
             if cuesheet then
               metadata_update(TimeSent);
 
-            BytesToSend := aac_GetFrames(fs, FramesToRead, buf);
+            BytesToSend := fmt_GetFrames(fs, FramesToRead, buf);
             //Sock.write(buf[0], BytesToSend);
             if not net_send(sock, buf[0], BytesToSend) then
             begin
-              hz_logln_term('... Disconneted from server', LOG_ERROR);
+              hz_logln_term('... Disconnected from server', LOG_ERROR);
               hz_log('Disconnected from server', LOG_ERROR);
               Connected := False;
               net_close(sock);
@@ -224,19 +258,29 @@ reconnect:
             end;
 
             FramesSent := FramesSent + FramesToRead;
+
+            // get on_play script result
+            onplay := 0; //script_onplay(filename, FramesSent, frames);
+
             TimeElapsed := dword(MilliSecondsBetween(Now, TimeBegin));
-            TimeSent := Round( ((FramesSent * 1024) / sr) * 1000);
-            BufferSent := TimeSent - TimeElapsed;
+            TimeSent := Round( ((FramesSent * spf) / sr) * 1000);
+
+            if TimeElapsed > TimeSent then
+              BufferSent := 0
+            else
+              BufferSent := TimeSent - TimeElapsed;
 
             // calculate the send lag
             SendLag := dword(MilliSecondsBetween(Now, SendBegin));
 
-            hz_log_term(#13'Frames: ' + IntToStr(FramesSent) + '/' +
+            if TimeElapsed > 1500 then
+            hz_log_term('Frames: ' + IntToStr(FramesSent) + '/' +
               IntToStr(frames) + '  Time: ' +
               IntToStr(TimeElapsed div 1000) + '/' +
               IntToStr(TimeSent div 1000) + 's  Buffer: ' +
-              IntToStr(BufferSent) + 'ms', LOG_INFO);
-              //SendLag: ', SendLag, 'ms    ');
+              IntToStr(BufferSent) + 'ms  Bps: ' + IntToStr(BytesToSend) + #13,// +
+              //'SendLag: ' + IntToStr(SendLag) + 'ms    ',
+              LOG_INFO);
 
             // regulate sending rate
             // ---------------------
@@ -250,29 +294,42 @@ reconnect:
             end;
 
             // check for user abort
-            if IsAborted then
+            if IsAborted or (onplay = -2) then
             begin
-              hz_logln_term('... Aborted', LOG_INFO);
-              hz_log('Aborted by user', LOG_INFO);
+              pause(200);
+              hz_logln_term('Frames: ' + IntToStr(FramesSent) + '/' +
+              IntToStr(frames) + '  Time: ' +
+              IntToStr(TimeElapsed div 1000) + '/' +
+              IntToStr(TimeSent div 1000) + 's  Buffer: ' +
+              IntToStr(BufferSent) + 'ms  Bps: ' + IntToStr(BytesToSend),// +
+              //'SendLag: ' + IntToStr(SendLag) + 'ms    ',
+              LOG_INFO);
+
+              hz_log_both('Aborted by user/SIGTERM', LOG_INFO);
               exit;
             end;
+
+            if onplay = -1 then break;
+
             // sleep for required time
             pause(TimePause);
           end;
 
-          // close the aac file
+          // close the audio file
           fs.free;
 
           hz_logln_term(#13'Frames: ' + IntToStr(frames) + '  Time: ' +
               IntToStr(TimeElapsed div 1000) + '/' +
-              IntToStr(TimeSent div 1000) + 's... Finished                            ', LOG_INFO);
+              IntToStr(TimeSent div 1000) + 's... Finished', LOG_INFO);
 
           // pause between tracks
           // --------------------
-          TimeBetweenTracks := Round( ((frames * 1024) / sr) * 1000) - dword(MilliSecondsBetween(Now, TimeBegin));
-          hz_log_both('Pausing for ' + IntToStr(TimeBetweenTracks) + 'ms...', LOG_DEBUG);
-          pause(TimeBetweenTracks);
-
+          if onplay <> -1 then
+          begin
+            TimeBetweenTracks := Round( ((frames * spf) / sr) * 1000) - dword(MilliSecondsBetween(Now, TimeBegin));
+            hz_log_both('Pausing for ' + IntToStr(TimeBetweenTracks) + 'ms...', LOG_DEBUG);
+            pause(TimeBetweenTracks);
+          end;
         end;
         writeln;
 

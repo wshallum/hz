@@ -26,16 +26,17 @@ interface
 uses SysUtils, IniFiles;
 
 const
-  version = '0.5';
+  version = '0.6';
   crlf = #13#10;
 
 type
   TOptions = record
+    streamtype:     string;
     Server:         string;
     host:           string;
     port:           integer;
     mount:          string;
-    connattempts:    integer;
+    connattempts:   integer;
     password:       string;
     buffersize:     integer;
     playlist:       string;
@@ -52,6 +53,7 @@ type
     url:            string;
     genre:          string;
     IsPublic:       integer;
+    IsDaemon:       integer;
   end;
 
 procedure loadconfig(ConfigFile: string);
@@ -79,6 +81,7 @@ begin
   Opts.connattempts := cf.ReadInteger(s_server, 'connectionattempts', 5);
 
   //
+  Opts.streamtype := cf.ReadString(s_stream, 'streamtype', 'aac');
   Opts.name := cf.ReadString(s_stream, 'name', 'hz radio station');
   Opts.descr := cf.ReadString(s_stream, 'description', 'check out our cranky tunes!');
   Opts.url := cf.ReadString(s_stream, 'url', 'http://radio.hz');
@@ -96,6 +99,7 @@ begin
   Opts.npfile := cf.ReadString(s_misc, 'npfile', '/tmp/hznp.tmp');
   Opts.logfile := cf.ReadString(s_misc, 'logfile', '/tmp/hz.log');
   Opts.loglevel := cf.ReadInteger(s_misc, 'loglevel', 0);
+  Opts.IsDaemon := cf.ReadInteger(s_misc, 'daemon', 0);
 
   //
   cf.Free;

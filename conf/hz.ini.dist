@@ -24,6 +24,14 @@ connectionattempts = 10
 
 [stream]
 
+; stream type
+; must be either 'aac' or 'mpeg'
+; in case of aac all your files in the playlist must be of AAC/AACplus/AACplusV2 type
+; in case of mpeg they must be of MPEG1/MPEG2/MPEG2.5 Layer I/Layer II/Layer III type
+; don't ever mix mpeg and aac in one playlist
+; also all files must have the same samplerate and number of channels
+streamtype = aac
+
 ; stream name
 name = lost in space station
 
@@ -53,7 +61,12 @@ playlisttype = internal
 ; if playlisttype is 'lua', then playlist is ignored
 ; and some predefined functions (in a script defined with 'script' directive)
 ; get called by hz for playlist handling
-playlist = playlist.txt
+; ___________________________________________
+; don't ever mix mpeg and aac in one playlist
+; also all files in the playlist MUST have the same samplerate and number of channels
+; or your player will get stuck or even worse
+
+playlist = /home/hz/playlist.txt
 
 ; random play order flag, 1 for random, 0 for sequential
 ; only valid if playlisttype is 'internal'
@@ -63,6 +76,10 @@ playrandom = 0
 ;-------
 
 [misc]
+
+; set daemon to 1 to make hz work in the background
+; this works only on Linux
+daemon = 0
 
 ; send-ahead buffer size in seconds
 buffersize = 3
@@ -78,7 +95,7 @@ script = /home/hz/script.lua
 
 ; nowplay temporary file. used to resume play from the same track
 ; between subsequent hz runs.
-npfile = np.tmp
+npfile = /tmp/np.tmp
 
 ; hz log file
 logfile = /home/hz/hz.log

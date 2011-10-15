@@ -35,11 +35,9 @@ function tag_get_id3v1(filename: string; var Artist, Title: string): string;
 var
   fs: TFileStream;
   id3v1: array[0..127] of char;
-  //Artist, Title: string;
   i: integer;
 begin
   Result := '';
-  //Artist := ''; Title := '';
   if not FileExists(filename) then exit;
   fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyWrite);
   try
@@ -78,7 +76,7 @@ end;
 
 {
 ***
- This function is a quick hack. I'm to lazy to parse ID3V2 frames.
+ This function is a quick hack. I'm too lazy to parse ID3V2 frames.
 ***
  }
 function tag_get_id3v2(filename: string; var Artist, Title: string): string;
@@ -96,10 +94,12 @@ var
 begin
   Result := '';
 
-  for i := 0 to (size - 1) do
+  for i := 0 to (size - 1 - Length(framename)) do
   begin
     for j := 0 to 3 do
+    begin
       frame[j] := id3v2[i + j];
+    end;
 
     if frame = framename then
     begin
@@ -143,11 +143,11 @@ begin
   Artist := Trim(get_id3v2_frame('TPE1'));
   Title  := Trim(get_id3v2_frame('TIT2'));
 
-  (*hz_log_term(#13'                                                   '#13, LOG_INFO);
+  (*
   hz_log_both('ID3v2 tag found', LOG_DEBUG);
   hz_log_both('Artist : ' + Artist, LOG_INFO);
   hz_log_both('Title  : ' + Title, LOG_INFO);
-    *)
+  *)
   Result := Artist + ' - ' + Title;
 
 end;
