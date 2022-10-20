@@ -28,7 +28,7 @@ type
 
 const
 {$IFDEF LINUX}
-  LuaDLL = 'lua';
+  LuaDLL = 'liblua5.1';
 {$ELSE}
   LuaDLL = 'lua5.1.dll';
 {$ENDIF}

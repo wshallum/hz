@@ -26,7 +26,7 @@ interface
 uses SysUtils, IniFiles;
 
 const
-  version = '0.6';
+  version = '0.61';
   crlf = #13#10;
 
 type

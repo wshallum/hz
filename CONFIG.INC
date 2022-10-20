@@ -1,1 +1,1 @@
-{$DEFINE USE_LUA}
+//{$DEFINE USE_LUA}

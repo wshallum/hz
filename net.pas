@@ -17,6 +17,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *}
 
+
 unit net;
 {$MODE DELPHI}
 {$H+}
@@ -35,11 +36,12 @@ implementation
 function net_connect(host: string; port: word; var sock: integer): boolean;
 var
   SAddr: TSockAddr;
+  //psaddr: psockaddr;
   s: integer;
   R: THostResolver;
 begin
   Result := False;
-  s := Socket(AF_INET, SOCK_STREAM, 0);
+  s := fpSocket(AF_INET, SOCK_STREAM, 0);
   if s = -1 then
   begin
     writeln('error socket= ', SocketError);
@@ -62,7 +64,7 @@ begin
       R.Free;
     end;
   end;
-  if not Connect(s, SAddr, sizeof(SAddr)) then
+  if fpConnect(s, @SAddr, sizeof(SAddr)) = -1 then
   begin
     //writeln('error connect');
     net_close(s);
@@ -73,8 +75,11 @@ begin
 end;
 
 function net_send(sock: integer; const buf; length: integer): boolean;
+var
+  p: pchar;
 begin
-  if Send(sock, buf, length, 0) = -1 then
+  p := pchar(buf);
+  if fpSend(sock, @buf, length, 0) = -1 then
   begin
     //writeln('error send');
     Result := False;
@@ -91,7 +96,7 @@ var
   i: integer;
 begin
   Result := '';
-  received := Recv(sock, buf[0], sizeof(buf), 0);
+  received := fpRecv(sock, @buf[0], sizeof(buf), 0);
   if received = -1 then
   begin
     //writeln('recv error');
@@ -106,7 +111,7 @@ end;
 
 procedure net_close(sock: integer);
 begin
-  Shutdown(sock, 2);
+  fpShutdown(sock, 2);
   CloseSocket(sock);
 end;
 
